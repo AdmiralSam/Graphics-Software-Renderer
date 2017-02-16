@@ -16,15 +16,15 @@ namespace Library
 
 		template<typename VertexOut> void LoadEdge(VertexOut& start, VertexOut& end, float* startInterpolants, float* endInterpolants) const
 		{
-			startInterpolants[0] = 1.0f;
-			startInterpolants[1] = start.position[2];
+			startInterpolants[0] = start.position[2];
+			startInterpolants[1] = 1.0f;
 			float* startData = reinterpret_cast<float*>(&start);
 			std::memcpy(startInterpolants + 2, startData + 4, sizeof(VertexOut) - sizeof(Vector));
-			endInterpolants[0] = 1.0f;
-			endInterpolants[1] = end.position[2];
+			endInterpolants[0] = end.position[2];
+			endInterpolants[1] = 1.0f;
 			float* endData = reinterpret_cast<float*>(&end);
 			std::memcpy(endInterpolants + 2, endData + 4, sizeof(VertexOut) - sizeof(Vector));
-			for (int i = 0; i < sizeof(VertexOut) / sizeof(float) - 2; i++)
+			for (int i = 1; i < sizeof(VertexOut) / sizeof(float) - 2; i++)
 			{
 				startInterpolants[i] /= start.position[3];
 				endInterpolants[i] /= end.position[3];
@@ -179,16 +179,16 @@ namespace Library
 						{
 							interpolants[j] += deltaInterpolants[j];
 						}
-						float w = 1.0f / interpolants[0];
+						float w = 1.0f / interpolants[1];
 						memcpy(homogenizedInterpolants, interpolants, sizeof(float) * numberOfInterpolants);
-						for (int j = 0; j < numberOfInterpolants; j++)
+						for (int j = 1; j < numberOfInterpolants; j++)
 						{
 							homogenizedInterpolants[j] *= w;
 						}
 						VertexOut* fragment = &rasterizationOutput[fragmentSize++];
 						fragment->position[0] = x;
 						fragment->position[1] = y;
-						fragment->position[2] = homogenizedInterpolants[1];
+						fragment->position[2] = homogenizedInterpolants[0];
 						fragment->position[3] = w;
 						float* fragmentData = reinterpret_cast<float*>(fragment);
 						std::memcpy(fragmentData + 4, homogenizedInterpolants + 2, sizeof(VertexOut) - sizeof(Vector));
