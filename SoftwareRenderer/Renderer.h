@@ -31,6 +31,25 @@ namespace Library
 			}
 		}
 
+		template<typename VertexOut> void LoadClippingEdge(VertexOut& in, VertexOut& out, float* inInterpolants, float* outInterpolants) const
+		{
+			float* startData = reinterpret_cast<float*>(&in);
+			std::memcpy(inInterpolants, startData, sizeof(VertexOut));
+			float* endData = reinterpret_cast<float*>(&out);
+			std::memcpy(outInterpolants, endData, sizeof(VertexOut));
+		}
+
+		inline float CalculateClippingParameter(const float inValue, const float inW, const float outValue, const float outW, const float side)
+		{
+			float numerator = side * inW - inValue;
+			float denominator = (outValue - inValue) - side * (outW - inW);
+			if (std::fabsf(denominator) < Epsilon)
+			{
+				return 0.0f;
+			}
+			return numerator / denominator;
+		}
+
 	public:
 		Renderer(const int width, const int height);
 		~Renderer();
@@ -50,39 +69,122 @@ namespace Library
 			}
 
 			// Clipping Stage
-			std::vector<VertexOut> clippingOutput;
+			std::vector<VertexOut> clippingOutput, clippingBuffer;
+			clippingBuffer = vertexOutput;
 			clippingOutput.reserve(vertexOutput.size());
-			for (int i = 0; i + 2 < vertexOutput.size(); i += 3)
+
+			float* insideInterpolants = (float*)malloc(sizeof(VertexOut));
+			float* outsideInterpolants = (float*)malloc(sizeof(VertexOut));
+			float* clippedInterpolants = (float*)malloc(sizeof(VertexOut));
+
+			bool bufferIsOutput = false;
+			std::vector<int> inside, outside;
+			for (int dimension = 0; dimension < 3; dimension++)
 			{
-				bool inFrustrum = true;
-				for (int j = 0; j < 3; j++)
+				for (float side = -1.0f; side <= 1.0f; side += 2.0f)
 				{
-					Vector clipPosition = vertexOutput[i + j].position;
-					if (clipPosition[3] < 0) {
-						inFrustrum = false;
-						break;
-					}
-					float homogenizer = (1.0f / clipPosition[3]);
-					clipPosition = clipPosition * homogenizer;
-					for (int k = 0; k < 3; k++)
+					vector<VertexOut>& input = bufferIsOutput ? clippingOutput : clippingBuffer;
+					vector<VertexOut>& output = bufferIsOutput ? clippingBuffer : clippingOutput;
+					output.clear();
+					for (int i = 0; i + 2 < input.size(); i += 3)
 					{
-						if (clipPosition[k] < -1.0f || clipPosition[k] > 1.0f)
+						inside.clear();
+						outside.clear();
+						for (int j = 0; j < 3; j++)
 						{
-							inFrustrum = false;
+							if (side * input[i + j].position[dimension] > input[i + j].position[3])
+							{
+								outside.push_back(j);
+							}
+							else
+							{
+								inside.push_back(j);
+							}
+						}
+						switch (inside.size())
+						{
+						case 3:
+							for (int j = 0; j < 3; j++)
+							{
+								output.push_back(input[i + j]);
+							}
+							break;
+						case 2:
+						{
+							VertexOut& inVertex1 = input[i + inside[0]];
+							VertexOut& inVertex2 = input[i + inside[1]];
+							VertexOut& outVertex = input[i + outside[0]];
+							VertexOut clippedVertices1[3];
+							clippedVertices1[inside[0]] = inVertex1;
+							clippedVertices1[inside[1]] = inVertex2;
+							LoadClippingEdge<VertexOut>(inVertex1, outVertex, insideInterpolants, outsideInterpolants);
+							float parameter = CalculateClippingParameter(inVertex1.position[dimension], inVertex1.position[3], outVertex.position[dimension], outVertex.position[3], side);
+							for (int j = 0; j < sizeof(VertexOut) / sizeof(float); j++)
+							{
+								clippedInterpolants[j] = Lerp(insideInterpolants[j], outsideInterpolants[j], parameter);
+							}
+							std::memcpy(&clippedVertices1[outside[0]], clippedInterpolants, sizeof(VertexOut));
+							for (int j = 0; j < 3; j++)
+							{
+								output.push_back(clippedVertices1[j]);
+							}
+
+							VertexOut clippedVertices2[3];
+							clippedVertices2[inside[1]] = inVertex2;
+							std::memcpy(&clippedVertices2[inside[0]], clippedInterpolants, sizeof(VertexOut));
+							LoadClippingEdge<VertexOut>(inVertex2, outVertex, insideInterpolants, outsideInterpolants);
+							parameter = CalculateClippingParameter(inVertex2.position[dimension], inVertex2.position[3], outVertex.position[dimension], outVertex.position[3], side);
+							for (int j = 0; j < sizeof(VertexOut) / sizeof(float); j++)
+							{
+								clippedInterpolants[j] = Lerp(insideInterpolants[j], outsideInterpolants[j], parameter);
+							}
+							std::memcpy(&clippedVertices2[outside[0]], clippedInterpolants, sizeof(VertexOut));
+							for (int j = 0; j < 3; j++)
+							{
+								output.push_back(clippedVertices2[j]);
+							}
+						};
+						break;
+						case 1:
+						{
+							VertexOut& inVertex = input[i + inside[0]];
+							VertexOut clippedVertices[3];
+							clippedVertices[inside[0]] = inVertex;
+							for (int j = 0; j < 2; j++)
+							{
+								VertexOut& outVertex = input[i + outside[j]];
+								LoadClippingEdge<VertexOut>(inVertex, outVertex, insideInterpolants, outsideInterpolants);
+								float parameter = CalculateClippingParameter(inVertex.position[dimension], inVertex.position[3], outVertex.position[dimension], outVertex.position[3], side);
+								for (int k = 0; k < sizeof(VertexOut) / sizeof(float); k++)
+								{
+									clippedInterpolants[k] = Lerp(insideInterpolants[k], outsideInterpolants[k], parameter);
+								}
+								std::memcpy(&clippedVertices[outside[j]], clippedInterpolants, sizeof(VertexOut));
+							}
+							for (int j = 0; j < 3; j++)
+							{
+								output.push_back(clippedVertices[j]);
+							}
+						};
+						break;
+						default:
 							break;
 						}
 					}
-					if (!inFrustrum)
-						break;
-				}
-				if (inFrustrum)
-				{
-					for (int j = 0; j < 3; j++)
-					{
-						clippingOutput.push_back(vertexOutput[i + j]);
-					}
+					bufferIsOutput = !bufferIsOutput;
 				}
 			}
+			clippingOutput.clear();
+			for (int i = 0; i < clippingBuffer.size(); i++)
+			{
+				if (clippingBuffer[i].position[3] >= 0.0f)
+				{
+					clippingOutput.push_back(clippingBuffer[i]);
+				}
+			}
+			free(insideInterpolants);
+			free(outsideInterpolants);
+			free(clippedInterpolants);
 
 			// Homogenization and Viewport Transform Stage
 			std::vector<VertexOut> transformOutput;
@@ -92,8 +194,8 @@ namespace Library
 				VertexOut vertex = clippingOutput[i];
 				float homogenizer = (1.0f / vertex.position[3]);
 				vertex.position = vertex.position * homogenizer;
-				vertex.position[0] = (vertex.position[0] + 1.0f) * width / 2.0f;
-				vertex.position[1] = (vertex.position[1] + 1.0f) * height / 2.0f;
+				vertex.position[0] = Clamp(0.0f, window_width, (vertex.position[0] + 1.0f) * width / 2.0f);
+				vertex.position[1] = Clamp(0.0f, window_height, (vertex.position[1] + 1.0f) * height / 2.0f);
 				vertex.position[3] = 1.0f / homogenizer;
 				transformOutput.push_back(vertex);
 			}
@@ -122,14 +224,11 @@ namespace Library
 						top = i;
 					}
 				}
-				Vector one = vertices[(top + 1) % 3].position;
-				Vector two = vertices[(top + 2) % 3].position;
-				Vector first = vertices[top].position;
-				float nextY = std::fminf(one[1], two[1]);
-				float oneParameter = Parameter(first[1], one[1], nextY);
-				float twoParameter = Parameter(first[1], two[1], nextY);
+				Vector& one = vertices[(top + 1) % 3].position;
+				Vector& two = vertices[(top + 2) % 3].position;
+				Vector& first = vertices[top].position;
 				int left, right;
-				if (Lerp(first[0], one[0], oneParameter) < Lerp(first[0], two[0], twoParameter))
+				if (CrossProduct2D(one[0] - first[0], one[1] - first[1], two[0] - first[0], two[1] - first[1]) <= 0.0f)
 				{
 					left = (top + 1) % 3;
 					right = (top + 2) % 3;
@@ -139,7 +238,6 @@ namespace Library
 					left = (top + 2) % 3;
 					right = (top + 1) % 3;
 				}
-
 				float y = Round(first[1]) + 0.5f;
 				VertexOut leftStart = vertices[top];
 				VertexOut leftEnd = vertices[left];
@@ -180,7 +278,7 @@ namespace Library
 							interpolants[j] += deltaInterpolants[j];
 						}
 						float w = 1.0f / interpolants[1];
-						memcpy(homogenizedInterpolants, interpolants, sizeof(float) * numberOfInterpolants);
+						std::memcpy(homogenizedInterpolants, interpolants, sizeof(float) * numberOfInterpolants);
 						for (int j = 1; j < numberOfInterpolants; j++)
 						{
 							homogenizedInterpolants[j] *= w;

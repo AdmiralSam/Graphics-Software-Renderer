@@ -3,6 +3,8 @@
 
 namespace Library
 {
+	const float Epsilon = 0.001f;
+
 	inline int Round(const float number)
 	{
 		bool roundDown = number - (int)number <= 0.5f;
@@ -17,9 +19,14 @@ namespace Library
 	inline float Parameter(const float start, const float end, const float value)
 	{
 		float difference = end - start;
-		if (difference < 0.00001f && -difference < 0.00001f)
+		if (std::fabsf(difference) < 0.00001f)
 			return 0.0f;
 		return (value - start) / difference;
+	}
+
+	inline float CrossProduct2D(const float x1, const float y1, const float x2, const float y2)
+	{
+		return x1 * y2 - y1 * x2;
 	}
 
 #undef min

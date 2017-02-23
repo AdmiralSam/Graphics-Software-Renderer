@@ -17,6 +17,7 @@ using namespace std;
 using namespace Library;
 
 extern FrameBuffer fb;
+extern int shader_mode;
 map<Texture*, vector<Triangle*>> trianglesPerTexture;
 Matrix projection;
 Matrix modelView;
@@ -46,62 +47,71 @@ void Scene::renderSceneSoftware(void) {
 			trianglesPerTexture[current->t->tex].push_back(current->t);
 		}
 	}
-	TextureShader shader;
-	shader.modelViewProjection = projection * modelView;
-	renderer.Clear();
-	for (const auto& pair : trianglesPerTexture)
+	switch (shader_mode)
 	{
-		shader.texture = Sampler(pair.first);
-		vector<TextureShaderIn> list;
-		for (const auto& triangle : pair.second)
+	case 0:
+	{
+		TextureShader shader;
+		shader.modelViewProjection = projection * modelView;
+		renderer.Clear();
+		for (const auto& pair : trianglesPerTexture)
+		{
+			shader.texture = Sampler(pair.first);
+			vector<TextureShaderIn> list;
+			for (const auto& triangle : pair.second)
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					TextureShaderIn vertex;
+					memcpy(&vertex.position, &triangle->v[i], sizeof(float) * 4);
+					vertex.u = triangle->coords[i][0];
+					vertex.v = triangle->coords[i][1];
+					list.push_back(vertex);
+				}
+			}
+			renderer.Draw<TextureShaderIn, TextureShaderVertexOut, TextureShaderOut>(shader, list);
+		}
+	};
+		break;
+	case 1:
+	{
+		BasicShader shader;
+		shader.modelViewProjection = projection * modelView;
+		vector<BasicIn> list;
+		for (TriangleList* current = original_head; current != NULL; current = current->next)
 		{
 			for (int i = 0; i < 3; i++)
 			{
-				TextureShaderIn vertex;
-				memcpy(&vertex.position, &triangle->v[i], sizeof(float) * 4);
-				vertex.u = triangle->coords[i][0];
-				vertex.v = triangle->coords[i][1];
+				BasicIn vertex;
+				memcpy(&vertex.position, &current->t->v[i], sizeof(float) * 4);
 				list.push_back(vertex);
 			}
 		}
-		renderer.Draw<TextureShaderIn, TextureShaderVertexOut, TextureShaderOut>(shader, list);
-	}
-	renderer.WriteToPointer(fb.getColorPtr(0, 0));
-	/*
-	BasicShader shader;
-	shader.modelViewProjection = projection * modelView;
-	vector<BasicIn> list;
-	for (TriangleList* current = original_head; current != NULL; current = current->next)
-	{
-		for (int i = 0; i < 3; i++)
-		{
-			BasicIn vertex;
-			memcpy(&vertex.position, &current->t->v[i], sizeof(float) * 4);
-			list.push_back(vertex);
-		}
-	}
 
-	renderer.Clear();
-	renderer.Draw<BasicIn, BasicVertexOut, BasicOut>(shader, list);
-	renderer.WriteToPointer(fb.getColorPtr(0, 0));
-	*/
-	/*
-	CheckeredShader shader;
-	shader.modelViewProjection = projection * modelView;
-	vector<CheckeredIn> list;
-	for (TriangleList* current = original_head; current != NULL; current = current->next)
+		renderer.Clear();
+		renderer.Draw<BasicIn, BasicVertexOut, BasicOut>(shader, list);
+	};
+		break;
+	case 2:
 	{
-		for (int i = 0; i < 3; i++)
+		CheckeredShader shader;
+		shader.modelViewProjection = projection * modelView;
+		vector<CheckeredIn> list;
+		for (TriangleList* current = original_head; current != NULL; current = current->next)
 		{
-			CheckeredIn vertex;
-			memcpy(&vertex.position, &current->t->v[i], sizeof(float) * 4);
-			vertex.u = current->t->coords[i][0];
-			vertex.v = current->t->coords[i][1];
-			list.push_back(vertex);
+			for (int i = 0; i < 3; i++)
+			{
+				CheckeredIn vertex;
+				memcpy(&vertex.position, &current->t->v[i], sizeof(float) * 4);
+				vertex.u = current->t->coords[i][0];
+				vertex.v = current->t->coords[i][1];
+				list.push_back(vertex);
+			}
 		}
+		renderer.Clear();
+		renderer.Draw<CheckeredIn, CheckeredVertexOut, CheckeredOut>(shader, list);
+	};
+		break;
 	}
-	renderer.Clear();
-	renderer.Draw<CheckeredIn, CheckeredVertexOut, CheckeredOut>(shader, list);
 	renderer.WriteToPointer(fb.getColorPtr(0, 0));
-	*/
 }

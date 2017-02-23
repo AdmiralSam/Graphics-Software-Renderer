@@ -17,6 +17,7 @@ extern Scene scene;
 
 bool opengl_test = true;
 bool bilerp_flag = false;
+int shader_mode = 0;
 
 Timer timer1;
 
@@ -114,6 +115,11 @@ void keyboard(unsigned char key, int x, int y) {
 			bilerp_flag = !bilerp_flag;
 			switchTextureFiltering();
 			redisplay();
+		case '1': // Texture Shader
+		case '2': // Color Shader
+		case '3': // Checkered Shader
+			shader_mode = key - '1';
+			break;
 		default:
 			break;
 	}
