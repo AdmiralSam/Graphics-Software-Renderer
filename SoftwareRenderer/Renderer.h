@@ -33,10 +33,8 @@ namespace Library
 
 		template<typename VertexOut> void LoadClippingEdge(VertexOut& in, VertexOut& out, float* inInterpolants, float* outInterpolants) const
 		{
-			float* startData = reinterpret_cast<float*>(&in);
-			std::memcpy(inInterpolants, startData, sizeof(VertexOut));
-			float* endData = reinterpret_cast<float*>(&out);
-			std::memcpy(outInterpolants, endData, sizeof(VertexOut));
+			std::memcpy(inInterpolants, &in, sizeof(VertexOut));
+			std::memcpy(outInterpolants, &out, sizeof(VertexOut));
 		}
 
 		inline float CalculateClippingParameter(const float inValue, const float inW, const float outValue, const float outW, const float side)
