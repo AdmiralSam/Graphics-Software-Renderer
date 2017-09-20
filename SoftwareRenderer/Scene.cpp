@@ -69,7 +69,7 @@ void Scene::renderSceneSoftware(void) {
 					list.push_back(vertex);
 				}
 			}
-			renderer.Draw<TextureShaderIn, TextureShaderVertexOut, TextureShaderOut>(shader, list);
+			renderer.Draw(shader, list);
 		}
 	};
 		break;
@@ -89,7 +89,7 @@ void Scene::renderSceneSoftware(void) {
 		}
 
 		renderer.Clear();
-		renderer.Draw<BasicIn, BasicVertexOut, BasicOut>(shader, list);
+		renderer.Draw(shader, list);
 	};
 		break;
 	case 2:
@@ -109,7 +109,7 @@ void Scene::renderSceneSoftware(void) {
 			}
 		}
 		renderer.Clear();
-		renderer.Draw<CheckeredIn, CheckeredVertexOut, CheckeredOut>(shader, list);
+		renderer.Draw(shader, list);
 	};
 		break;
 	}
